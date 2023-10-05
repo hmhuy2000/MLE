@@ -2,17 +2,19 @@ from .SAC import *
 from Sources.networks.value import StateActionFunction
 
 class IQlearn(SAC_continuous):
-    def __init__(self, expert_dataset, state_shape, action_shape, device, seed, gamma,
+    def __init__(self, expert_dataset,suplement_buffers, state_shape, action_shape, device, seed, gamma,
             SAC_batch_size, buffer_size, lr_actor, lr_critic, 
             lr_alpha, hidden_units_actor, hidden_units_critic, 
             start_steps, tau,max_episode_length,reward_factor,
-            max_grad_norm, primarive=True):
+            max_grad_norm,args, primarive=True):
         super().__init__(state_shape, action_shape, device, seed, gamma,
             SAC_batch_size, buffer_size, lr_actor, lr_critic, 
             lr_alpha, hidden_units_actor, hidden_units_critic, 
             start_steps, tau,max_episode_length,reward_factor,
             max_grad_norm,primarive=False)
         self.expert_dataset = expert_dataset
+        self.suplement_buffers = suplement_buffers
+        self.args  = args
         if (primarive):
             # Actor.
             self.actor = StateIndependentPolicy(
@@ -73,27 +75,41 @@ class IQlearn(SAC_continuous):
     def update_critic(self, exp_states, exp_actions, exp_next_states,exp_dones, log_info):
         current_qs = self.critic(exp_states, exp_actions)
         y = (1.0 - exp_dones)*self.gamma*self.get_targetV(exp_next_states)
+        
         rewards = (current_qs - y)
+        reward_loss = -rewards.mean() + 1/4*(rewards**2).mean()
         
-        with torch.no_grad():
-            phi_grad = 1
-            
-        reward_loss = -(phi_grad*rewards).mean()
-        value_loss = (self.getV(exp_states) - y).mean()
-        positive_loss = torch.exp(-current_qs).max()
-        chi2_loss = 0.5*(rewards**2).mean()
+        value_dif = self.getV(exp_states) - y
+        value_loss = value_dif.mean() + 1/32*(value_dif**2).mean()
         
-        total_loss = 2*reward_loss + value_loss + positive_loss + chi2_loss
+        total_loss = reward_loss + value_loss
         self.optim_critic.zero_grad()
         total_loss.backward()
         self.optim_critic.step()
         
+        if (self.learning_steps%self.args.log_freq==0):
+            with torch.no_grad():
+                exp_log_prob = self.actor.evaluate_log_pi(exp_states,exp_actions)
+                _,pi_log_prob = self.actor.sample(exp_states)
+                for id,buffer in enumerate(self.suplement_buffers):
+                    buffer_states, buffer_actions, _, _, _ = \
+                        buffer.sample_state_action(batch_size = self.SAC_batch_size)
+                    buffer_log_prob = self.actor.evaluate_log_pi(buffer_states,buffer_actions)
+                    log_info.update({
+                        f'log_prob/buffer_{id}_log_prob':buffer_log_prob.mean().item(),
+                    })
+                    
+            log_info.update({
+                'log_prob/exp_log_prob':exp_log_prob.mean().item(),
+                'log_prob/pi_log_prob':pi_log_prob.mean().item(),
+            })
+                            
         log_info.update({
             'reward_loss':reward_loss.item(),
             'value_loss':value_loss.item(),
-            'chi2_loss':chi2_loss.item(),
-            'positive_loss':positive_loss.item(),
             'total_loss':total_loss.item(),
+            'reward':rewards.mean().item(),
+            'value_dif':value_dif.mean().item(),
             
         })
         

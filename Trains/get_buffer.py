@@ -43,7 +43,10 @@ def main():
             hidden_activation=nn.Tanh()
         ).to(device)
     expert_actor.load_state_dict(torch.load(
-        './weights/HalfCheetah-v4/SAC/(11233.639)-(11233.64)/actor.pth'
+        # './weights/HalfCheetah-v4/SAC/(11233.639)-(11233.64)/actor.pth'
+        # './weights/HalfCheetah-v4/SAC/(8892.292)-(8892.29)/actor.pth'
+        # './weights/HalfCheetah-v4/SAC/(6346.880)-(6346.88)/actor.pth'
+        './weights/HalfCheetah-v4/SAC/(3061.660)-(3061.66)/actor.pth'
     ))
     expert_actor.eval()
     buffer_size = 1000
@@ -61,8 +64,8 @@ def main():
         tmp_buffer = [[] for _ in range(num_envs)]
 
         for iter in range(1000):
-            action = exploit(expert_actor,state)
-            # action,log_pi = explore(expert_actor,state)
+            # action = exploit(expert_actor,state)
+            action,log_pi = explore(expert_actor,state)
             next_state, reward, done, _, _ = env.step(action)
             for idx in range(num_envs):
                 tmp_buffer[idx].append((state[idx], action[idx], next_state[idx]))
@@ -94,7 +97,7 @@ def main():
               ,end='\r')
             
     print(rollout_traj_buffer.total_rewards.mean().item(),rollout_traj_buffer.total_rewards.max().item(),rollout_traj_buffer.total_rewards.min().item(),rollout_traj_buffer.total_rewards.std().item())
-    rollout_traj_buffer.save(f'./buffers/{env_name}/e0_exploit/{buffer_size}.pt')
+    rollout_traj_buffer.save(f'./buffers/{env_name}/e3/{buffer_size}.pt')
     env.close()
 
 if __name__ == '__main__':

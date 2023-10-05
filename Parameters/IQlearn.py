@@ -18,7 +18,8 @@ training_group.add_argument('--lr_critic', type=float, default=0.0003)
 training_group.add_argument('--lr_alpha', type=float, default=0.0001)
 
 training_group.add_argument('--num_traj',type=int,default=None)
-
+training_group.add_argument('--buffer_dirs',default=[], action='append')
+training_group.add_argument('--buffer_trajs',default=[], action='append', type=int)
 
 training_group.add_argument('--SAC_batch_size',type=int,default=4096)
 training_group.add_argument('--max_grad_norm', type=float, default=1.0)

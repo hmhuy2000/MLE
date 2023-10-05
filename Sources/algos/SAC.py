@@ -187,8 +187,6 @@ class SAC_continuous(Algorithm):
 
     def update_target(self):
         soft_update(self.critic_target, self.critic, self.tau)
-        # if (self.learning_steps%10 == 0):
-        #     hard_update(self.critic_target,self.critic)
 
     def train(self):
         self.actor.train()
