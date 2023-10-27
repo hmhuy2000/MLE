@@ -63,7 +63,6 @@ class SAC_continuous(Algorithm):
             soft_update(self.critic_target, self.critic, 1.0)
             disable_gradient(self.critic_target)
             self.alpha = 1.0
-            self.reward_factor = reward_factor
             self.alpha = torch.tensor(0.0).to(self.device)
             self.alpha.requires_grad = True
 
@@ -71,6 +70,7 @@ class SAC_continuous(Algorithm):
             self.optim_critic = Adam(self.critic.parameters(), lr=lr_critic)
             self.optim_alpha = torch.optim.Adam([self.alpha], lr=lr_alpha)
 
+        self.reward_factor = reward_factor
         self.num_envs = 1
         self.max_grad_norm = max_grad_norm
         self.max_episode_length = max_episode_length

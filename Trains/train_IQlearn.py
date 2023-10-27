@@ -8,6 +8,9 @@ def main():
     from Sources.utils import VectorizedWrapper
 
     sample_env = gymnasium.make(args.env_name)
+    env = [gymnasium.make(id=args.env_name) for _ in range(args.num_envs)]
+    env = VectorizedWrapper(env)
+    
     if (args.eval_num_envs):
         test_env = [gymnasium.make(id=args.env_name) for _ in range(args.eval_num_envs)]
         test_env = VectorizedWrapper(test_env)
@@ -50,21 +53,26 @@ def main():
         value = mean_return
         if (value>max_value):
             max_value = value
+            algo.save_models(f'{args.weight_path}/({mean_return:.2f})')
         else:
             max_value*=0.999
-        algo.save_models(f'{args.weight_path}/({value:.3f})-({mean_return:.2f})')
 
         args.eval_return.write(f'{mean_return:.3f}\n')
         args.eval_return.flush()
         print(f'[Eval] R: {mean_return:.2f}, '+
             f'V: {value:.2f}, maxV: {max_value:.2f}')
 
-    def train(test_env,algo,eval_actor):
+    def train(env,test_env,algo,eval_actor):
+        t = np.array([0 for _ in range(args.num_envs)])
         eval_thread = None
+        state,_ = env.reset()
+        
         print('start training')
         for step in range(1,args.num_training_step//args.num_envs+1):
             if (step%100 == 0):
                 print(f'train: {step/(args.num_training_step//args.num_envs)*100:.2f}% {step}/{args.num_training_step//args.num_envs}', end='\r')
+            state, t = algo.step(env, state, t)
+                
             if algo.is_update(step*args.num_envs):
                     log_info = {'log_cnt':(step*args.num_envs)//args.log_freq}
                     algo.update(log_info)
@@ -103,26 +111,8 @@ def main():
         +f', std: {expert_buffer.total_rewards.std().item():.2f}'
         )
     
-    buffer_ls = []
-    for (dir,traj) in zip(args.buffer_dirs, args.buffer_trajs):
-        buffer = Trajectory_Buffer(
-            buffer_size=traj,
-            traj_len=args.max_episode_length, 
-            state_shape=state_shape, 
-            action_shape=action_shape, 
-            device=args.device,
-        )
-        buffer.load(dir)
-        buffer_ls.append(buffer)
-        print(f'load {traj} trajectories from {dir}'
-        +f', max: {buffer.total_rewards.max().item():.2f}'
-        +f', min: {buffer.total_rewards.min().item():.2f}'
-        +f', mean: {buffer.total_rewards.mean().item():.2f}'
-        +f', std: {buffer.total_rewards.std().item():.2f}'
-        )
-    
     setproctitle.setproctitle(f'{args.env_name}-IQlearn-{args.seed}')
-    algo = IQlearn(expert_dataset=expert_buffer,suplement_buffers=buffer_ls,
+    algo = IQlearn(expert_dataset=expert_buffer,
             state_shape=state_shape, action_shape=action_shape, device=args.device, seed=args.seed, gamma=args.gamma,
                  SAC_batch_size=args.SAC_batch_size, buffer_size=args.buffer_size, lr_actor=args.lr_actor, lr_critic=args.lr_critic, 
                  lr_alpha=args.lr_alpha, hidden_units_actor=args.hidden_units_actor, hidden_units_critic=args.hidden_units_critic, 
@@ -133,7 +123,7 @@ def main():
     # wandb.init(project='offline-mujoco', settings=wandb.Settings(_disable_stats=True), \
     #     group=args.env_name,job_type=f'IQ-learn{args.num_traj}', name=f'{args.seed}', entity='hmhuy',config=args)
     print(args)
-    train(test_env=test_env,algo=algo,eval_actor=eval_actor)
+    train(env=env,test_env=test_env,algo=algo,eval_actor=eval_actor)
 
     if (test_env):
         test_env.close()

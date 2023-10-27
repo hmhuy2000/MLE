@@ -20,7 +20,7 @@ class Trajectory_Buffer:
         self.next_states    = torch.empty(
             (self.total_size, traj_len, *state_shape), dtype=torch.float, device=device)
         self.dones          = torch.empty(
-            (self.total_size, traj_len, *state_shape), dtype=torch.float, device=device)
+            (self.total_size, traj_len, 1), dtype=torch.float, device=device)
 
     def append(self, state, action,total_reward, next_state, done):
         self.states[self._p].copy_(torch.from_numpy(state))
@@ -123,6 +123,7 @@ class RolloutBuffer:
         )
 
     def sample(self, batch_size):
+        assert self._n >= batch_size
         idxes = np.random.randint(low=0, high=self._n, size=batch_size)
         return (
             self.states[idxes],

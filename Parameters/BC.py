@@ -52,7 +52,7 @@ args.hidden_units_actor                 = hidden_units_actor
 args.hidden_units_critic                = hidden_units_critic
 max_value                               = -np.inf
 
-args.weight_path = os.path.join(args.weight_path,args.env_name,f'MLE({args.num_traj})')
+args.weight_path = os.path.join(args.weight_path,args.env_name,f'BC({args.num_traj})')
 args.log_path = f'{args.weight_path}/log_data'
 os.makedirs(args.log_path,exist_ok=True)
 
